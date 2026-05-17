@@ -1,0 +1,11 @@
+pandas
+graphdatascience
+matplotlib
+numpy
+requests
+seaborn
+spacy
+textstat
+requests_html
+pymupdf
+python-dotenv
