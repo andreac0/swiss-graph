@@ -7,7 +7,7 @@ A comprehensive toolkit for extracting, modeling, and analyzing Swiss federal la
 The system follows a three-stage pipeline: **Extraction**, **Ingestion**, and **Analysis**.
 
 1.  **Extraction Pipeline**: Downloads legal acts in multiple languages, parses complex PDF structures using hierarchical layout analysis, and extracts metadata (titles, markers, citations).
-2.  **Database Ingestion**: Models the legal corpus as a Neo4j graph. It establishes nodes for Laws, Sections, and Annexes, and creates relationships for Citations (e.g., `CITES`, `MODIFIES`, `ABROGATES`).
+2.  **Database Ingestion**: Models the legal corpus as a Neo4j graph. It establishes nodes for Laws, Articles, and Annexes, and creates relationships for Citations (e.g., `CITES`, `AMENDS`, `ABROGATES`).
 3.  **Analysis Suite**: Leverages Graph Data Science (GDS) algorithms to identify central laws, community clusters, and temporal trends in Swiss legislation.
 
 ---
@@ -113,21 +113,21 @@ WHERE {
 Run these in the Neo4j Browser or via the Python API.
 
 #### **1. Top 10 Most Cited Laws**
-Identifies the "Cornerstone" laws of the Swiss legal system based on total citations received from other sections.
+Identifies the "Cornerstone" laws of the Swiss legal system based on total citations received from other Articles.
 ```cypher
-MATCH (source_law:Law)-[:HAS_ARTICLE]->(s:Section)
+MATCH (source_law:Law)-[:HAS_ARTICLE]->(s:Article)
 MATCH (s)-[r]->(target_law:Law)
-WHERE type(r) IN ['CITATION', 'MODIFIES', 'ABROGATES']
+WHERE type(r) IN ['CITATION', 'AMENDS', 'ABROGATES']
 RETURN target_law.lawId AS Law, count(r) AS Citations
 ORDER BY Citations DESC
 LIMIT 10
 ```
 
 #### **2. Explore a Law's Internal Structure**
-Retrieves all sections and annexes for a specific law.
+Retrieves all Articles and annexes for a specific law.
 ```cypher
 MATCH (l:Law {lawId: "RU 1999 181"})
-OPTIONAL MATCH (l)-[:HAS_ARTICLE]->(s:Section)
+OPTIONAL MATCH (l)-[:HAS_ARTICLE]->(s:Article)
 OPTIONAL MATCH (l)-[:HAS_ANNEX]->(a:Annex)
 RETURN l.title AS LawTitle, s.marker AS Article, a.title AS AnnexTitle
 ```
@@ -159,7 +159,7 @@ The extraction pipeline is designed to transform unstructured legal PDFs into st
 *   **Marker Detection**: Employs sophisticated regular expressions to identify various legal markers:
     *   **Roman Numerals**: Identifies major divisions (e.g., `I. Disposizioni generali`).
     *   **Article Markers**: Detects standard article headers (e.g., `Art. 1`, `Articolo 5`).
-    *   **Digit-Dot Markers**: Recognizes numbered lists and sub-sections (e.g., `1.`, `2.`).
+    *   **Digit-Dot Markers**: Recognizes numbered lists and sub-Articles (e.g., `1.`, `2.`).
 *   **Structural Parsing**: Titles are extracted by analyzing the spatial relationship between markers and surrounding text blocks, ensuring that only relevant headers are captured.
 
 #### **C. Reconstruction & Contextual Mapping (`reconstruction.py`)**
@@ -211,14 +211,14 @@ The legal corpus is modeled as a Property Graph in Neo4j, optimized for multi-ho
         *   `title_it/fr/de`: Multilingual document titles.
         *   `validity`: Current status (In force, Repealed, etc.).
         *   `publicationDate`, `decisionDate`, `entryintoforceDate`.
-    *   **`Section` Nodes**: Granular subdivisions (Articles).
+    *   **`Article` Nodes**: Granular subdivisions (Articles).
         *   `marker`: The article number (e.g., `Art. 1`).
         *   `text`: The actual legal prose.
         *   `topics`: NLP-extracted thematic tags.
     *   **`Annex` Nodes**: Appendices and supplementary documents attached to laws.
 *   **Relationship Semantics**:
-    *   `HAS_ARTICLE` / `HAS_ANNEX`: Structural hierarchy (Law → Section/Annex).
-    *   `CITES`: Standard reference from one section to another law.
+    *   `HAS_ARTICLE` / `HAS_ANNEX`: Structural hierarchy (Law → Article/Annex).
+    *   `CITES`: Standard reference from one Article to another law.
     *   `AMENDS`: Direct legislative updates.
     *   `REPLACES`: Temporal succession where a new law supersedes an old one.
 *   **Ingestion Pipeline**: `populate.py` implements a batched `UNWIND` pattern to handle thousands of records efficiently, ensuring idempotency via `MERGE` operations on unique act URIs.
@@ -234,7 +234,7 @@ Utilizes the **Neo4j Graph Data Science (GDS)** library to extract insights from
 *   **Community Detection**:
     *   **Louvain & Leiden**: Partitions the graph into clusters. These clusters often reveal hidden legislative domains (e.g., "Health Care Cluster", "Financial Regulations Cluster") where laws are densely interconnected despite belonging to different federal departments.
 *   **Linguistic & Accuracy Analysis**:
-    *   **NLP Topics**: Every `Section` is tagged with topics using NLP models, allowing for semantic search across the graph.
+    *   **NLP Topics**: Every `Article` is tagged with topics using NLP models, allowing for semantic search across the graph.
     *   **Accuracy Benchmarking**: `compare_accuracy.py` provides a framework to compare the fidelity of PDF-extracted text against official XML sources, quantifying the error rate of the layout-aware parser.
     *   **Language Analysis**: `compare_languages.py` evaluates the consistency of legal terminology and structure across the three official national languages.
 
